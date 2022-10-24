@@ -23,3 +23,23 @@ code {
   justify-content: center;
   align-items: center;
 }
+
+table {
+  width: 100%;
+  empty-cells: show;
+  border-collapse: collapse;
+  margin: 5px 0px 15px 0px;
+}
+
+table thead {
+  text-transform: uppercase;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+table td,
+table th {
+  padding: 8px 5px;
+  text-align: center;
+  font-size: 14px;
+}

@@ -15,3 +15,16 @@ export const shuffleArray = <T>(arr: T[]): T[] => {
 
   return arr;
 };
+
+export const splitAt = (i: number, arr: any[]) => {
+  const clonedArray = [...arr];
+  return [clonedArray.splice(0, i), clonedArray];
+};
+
+export const innerConcat = (arr1: any[], arr2: any[]) => {
+  return [...arr1, ...arr2].map((el, index) => {
+    const arrToGet = index % 2 === 0 ? arr1 : arr2;
+    const correctIndex = Math.floor(index / 2);
+    return arrToGet[correctIndex];
+  });
+};

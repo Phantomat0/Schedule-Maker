@@ -1,4 +1,4 @@
-import { shuffleArray } from "./utilts";
+import { innerConcat, shuffleArray, splitAt } from "./utilts";
 
 interface ScheduleSettings {
   /**
@@ -67,28 +67,35 @@ export default class ScheduleCreator {
   }
 
   create() {
-    const numberOfDays =
+    const numberOfGameDays =
       ((this._teams.length - 1) * this._settings.gamesAgainstEachTeam) /
       this._settings.gamesPerDay;
 
-    const numberOfGames = (numberOfDays * this._teams.length) / 2;
+    const numberOfGames =
+      (this._teams.length - 1) *
+      this._settings.gamesAgainstEachTeam *
+      (this._teams.length / 2);
 
     const maxIterationsCount = this._defineMaxIterationsCount();
 
     let currentSchedule: HomeAwayTuple[] = [];
-    let currentScheduleHashTable: Record<`${number}-${number}`, true> = {};
 
-    // const gamesPerDay = Math.floor(this._teams.length / 2);
+    let isValidHomeAndAway = false;
+
+    // We can only enforce valid home and away when the number of games each team has is even
+    const canEnforceValidHomeAndAway =
+      (numberOfGameDays * this._settings.gamesPerDay) % 2 === 0;
 
     while (
-      currentSchedule.length <
-      numberOfGames / this._settings.gamesAgainstEachTeam
+      currentSchedule.length < numberOfGames ||
+      (isValidHomeAndAway === false &&
+        canEnforceValidHomeAndAway &&
+        this._teams.length < 11)
     ) {
       currentSchedule = [];
-      currentScheduleHashTable = {};
       console.log("Create new Schedule");
 
-      for (let i = 0; i < numberOfDays / 2; i++) {
+      for (let i = 0; i < numberOfGameDays; i++) {
         let isValidDay = false;
         let dayIterations = 0;
 
@@ -104,20 +111,30 @@ export default class ScheduleCreator {
           isValidDay = this._validatePairs(
             pairs,
             byeTeam,
-            currentScheduleHashTable
+            currentSchedule,
+            Math.floor(
+              i / (numberOfGameDays / this._settings.gamesAgainstEachTeam)
+            ) + 1
           );
 
           if (!isValidDay) continue;
 
           // Hash each matchup, and add it
           pairs.forEach((pair) => {
-            currentScheduleHashTable[`${pair[0]}-${pair[1]}`] = true;
             currentSchedule.push(pair);
           });
         }
 
         if (dayIterations === maxIterationsCount) break;
       }
+
+      // Check that every team has the same amount of home and away games
+      const homeGames = this._getAllTeamsNumberOfHomeGames(
+        this._teamsAsIds,
+        currentSchedule
+      );
+
+      isValidHomeAndAway = homeGames.every((el) => el === homeGames[0]);
     }
 
     return currentSchedule;
@@ -167,17 +184,56 @@ export default class ScheduleCreator {
   private _validatePairs(
     pairs: HomeAwayTuple[],
     byeTeam: number,
-    currentScheduleHashTable: Record<`${number}-${number}`, true>
+    currentSchedule: HomeAwayTuple[],
+    roundNumber: number
   ) {
     const duplicateMatchups = pairs.filter((pair) => {
-      const teamsHaveAlreadyPlayed =
-        `${pair[0]}-${pair[1]}` in currentScheduleHashTable ||
-        `${pair[1]}-${pair[0]}` in currentScheduleHashTable;
-      return teamsHaveAlreadyPlayed;
+      const matchesTeamsHavePlayed = currentSchedule.filter(
+        (matchUp) => matchUp.includes(pair[0]) && matchUp.includes(pair[1])
+      );
+      return matchesTeamsHavePlayed.length >= roundNumber;
     });
 
     if (duplicateMatchups.length > 0) return false;
     return true;
+  }
+
+  private _getAllTeamsNumberOfHomeGames(
+    teamIds: number[],
+    schedule: HomeAwayTuple[]
+  ) {
+    return teamIds.map((team) =>
+      this._getTeamsNumberOfHomeGames(team, schedule)
+    );
+  }
+
+  private _getTeamsNumberOfHomeGames(
+    teamId: number,
+    schedule: HomeAwayTuple[]
+  ) {
+    return schedule.filter((matchup) => matchup[0] === teamId).length;
+  }
+
+  private _shuffleTeams(teamsIds: number[], schedule: HomeAwayTuple[]) {
+    const sorted = this._sortByHomeGames(teamsIds, schedule);
+
+    const [homeMost, homeLeast] = splitAt(
+      Math.floor(teamsIds.length / 2),
+      sorted
+    );
+
+    const homeMostShuffled = shuffleArray(homeMost);
+    const homeLeastShuffled = shuffleArray(homeLeast);
+
+    return innerConcat(homeLeastShuffled, homeMostShuffled);
+  }
+
+  private _sortByHomeGames(teams: number[], schedule: HomeAwayTuple[]) {
+    return teams.sort(
+      (a, b) =>
+        this._getTeamsNumberOfHomeGames(b, schedule) -
+        this._getTeamsNumberOfHomeGames(a, schedule)
+    );
   }
 
   private _validateAndSetDaysOfWeek(daysOfWeek: number[]) {

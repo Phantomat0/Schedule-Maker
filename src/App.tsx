@@ -67,7 +67,7 @@ function App() {
   };
 
   const handleNumberOfTeamsChange = (e: any) => {
-    const value = e.target.value as number;
+    const value = parseInt(e.target.value as string);
 
     const MIN_VALUE = 2;
     const MAX_VALUE = 14;
@@ -99,7 +99,7 @@ function App() {
   const generateSchedule = () => {
     const timeStart = performance.now();
     const schedule = new ScheduleCreator(
-      ["1", "2", "3", "4", "5", "6"],
+      new Array(numberOfTeams).fill(1).map((el, index) => `${index}`),
       [2, 5],
       {
         gamesAgainstEachTeam: numberOfGamesAgainstEachTeam,
@@ -167,26 +167,6 @@ function App() {
 
       <button onClick={generateSchedule}>Generate Schedule</button>
 
-      <hr></hr>
-      <table>
-        <thead>
-          <tr>
-            <th>Home</th>
-            <th>Away</th>
-          </tr>
-        </thead>
-        <tbody>
-          {schedule.map((match) => {
-            return (
-              <tr>
-                <td>{match[0]}</td>
-                <td>{match[1]}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-
       <h2>Counts For Testing</h2>
 
       <table>
@@ -243,6 +223,26 @@ function App() {
                         .includes(id) === false && id !== team
                   ).join(" | ")}
                 </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+
+      <hr></hr>
+      <table>
+        <thead>
+          <tr>
+            <th>Home</th>
+            <th>Away</th>
+          </tr>
+        </thead>
+        <tbody>
+          {schedule.map((match) => {
+            return (
+              <tr>
+                <td>{match[0]}</td>
+                <td>{match[1]}</td>
               </tr>
             );
           })}

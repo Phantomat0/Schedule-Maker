@@ -1,6 +1,6 @@
 import { useState } from "react";
 import ScheduleCreator from "./ScheduleCreator";
-import { randFromArray } from "./utilts";
+import TeamList from "./TeamList";
 
 const DAYS_OF_THE_WEEK = [
   {
@@ -36,7 +36,7 @@ const DAYS_OF_THE_WEEK = [
 type HomeAwayTuple = [number, number];
 
 function App() {
-  const [numberOfTeams, setNumberOfTeams] = useState<number>(2);
+  const [teamsList, setTeamsList] = useState<string[]>(["Team 1"]);
   const [numberOfGamesAgainstEachTeam, setNumberOfGamesAgainstEachTeam] =
     useState<number>(1);
   const [daysOfTheWeek, setDaysOfTheWeek] = useState<number[]>([]);
@@ -66,18 +66,6 @@ function App() {
     setStartDate(date);
   };
 
-  const handleNumberOfTeamsChange = (e: any) => {
-    const value = parseInt(e.target.value as string);
-
-    const MIN_VALUE = 2;
-    const MAX_VALUE = 14;
-
-    if (value < MIN_VALUE || value > MAX_VALUE) {
-    } else {
-      setNumberOfTeams(value);
-    }
-  };
-
   const handleNumberOfGamesAgainstEachTeamChange = (e: any) => {
     const games = e.target.value as number;
 
@@ -92,14 +80,16 @@ function App() {
 
   const getTotalNumberOfGames = () => {
     return (
-      (numberOfTeams - 1) * numberOfGamesAgainstEachTeam * (numberOfTeams / 2)
+      (teamsList.length - 1) *
+      numberOfGamesAgainstEachTeam *
+      (teamsList.length / 2)
     );
   };
 
   const generateSchedule = () => {
     const timeStart = performance.now();
     const schedule = new ScheduleCreator(
-      new Array(numberOfTeams).fill(1).map((el, index) => `${index}`),
+      new Array(teamsList.length).fill(1).map((el, index) => `${index}`),
       [2, 5],
       {
         gamesAgainstEachTeam: numberOfGamesAgainstEachTeam,
@@ -117,14 +107,8 @@ function App() {
     <div className="App">
       <h1>Schedule Maker</h1>
 
-      <h3>Number Of Teams</h3>
-      <input
-        type="number"
-        onChange={handleNumberOfTeamsChange}
-        min="2"
-        max="14"
-        defaultValue={2}
-      ></input>
+      <h3>Teams</h3>
+      <TeamList teamList={teamsList} setTeamsList={setTeamsList} />
 
       <h3>Teams Play Each Other</h3>
       <input
@@ -181,25 +165,25 @@ function App() {
           </tr>
         </thead>
         <tbody>
-          {TEAM_IDS.map((team) => {
+          {teamsList.map((team, index) => {
             return (
               <tr>
                 <td>{team}</td>
                 <td>
-                  {schedule.filter((matchup) => matchup.includes(team)).length}
+                  {schedule.filter((matchup) => matchup.includes(index)).length}
                 </td>
                 <td>
-                  {schedule.filter((matchup) => matchup[0] === team).length}
+                  {schedule.filter((matchup) => matchup[0] === index).length}
                 </td>
                 <td>
-                  {schedule.filter((matchup) => matchup[1] === team).length}
+                  {schedule.filter((matchup) => matchup[1] === index).length}
                 </td>
                 <td>
                   {schedule
                     .reduce((acc: number[], val) => {
-                      if (val.includes(team) === false) return acc;
+                      if (val.includes(index) === false) return acc;
 
-                      const opp = val[0] === team ? val[1] : val[0];
+                      const opp = val[0] === index ? val[1] : val[0];
 
                       acc.push(opp);
 
@@ -212,15 +196,15 @@ function App() {
                     (id) =>
                       schedule
                         .reduce((acc: number[], val) => {
-                          if (val.includes(team) === false) return acc;
+                          if (val.includes(index) === false) return acc;
 
-                          const opp = val[0] === team ? val[1] : val[0];
+                          const opp = val[0] === index ? val[1] : val[0];
 
                           acc.push(opp);
 
                           return acc;
                         }, [])
-                        .includes(id) === false && id !== team
+                        .includes(id) === false && id !== index
                   ).join(" | ")}
                 </td>
               </tr>

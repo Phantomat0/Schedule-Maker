@@ -1,4 +1,5 @@
 import { useState } from "react";
+import ScheduleCreator from "./ScheduleCreator";
 import { randFromArray } from "./utilts";
 
 const DAYS_OF_THE_WEEK = [
@@ -42,7 +43,7 @@ function App() {
   const [startDate, setStartDate] = useState<Date>();
   const [schedule, setSchedule] = useState<HomeAwayTuple[]>([]);
 
-  const TEAM_IDS = [1, 2, 3, 4, 5, 6];
+  const TEAM_IDS = [0, 1, 2, 3, 4, 5];
 
   const handleDayOfWeekCheck = (e: any) => {
     const index = e.target.value;
@@ -75,7 +76,6 @@ function App() {
     } else {
       setNumberOfTeams(value);
     }
-    console.log(e.target.value);
   };
 
   const handleNumberOfGamesAgainstEachTeamChange = (e: any) => {
@@ -97,58 +97,20 @@ function App() {
   };
 
   const generateSchedule = () => {
-    const numberOfDays = (numberOfTeams - 1) * 2;
-
-    const DICTS_OF_GAMES: HomeAwayTuple[] = [];
-
-    const gamesPerDay = Math.floor(numberOfTeams / 2);
-
-    const teamHasAlreadyPlayed = (team: number, dict: HomeAwayTuple[]) => {
-      return dict.some((matchup) => matchup.includes(team));
-    };
-
-    const teamsHaveAlreadyPlayedEachOther = (
-      team1: number,
-      team2: number,
-      dict: HomeAwayTuple[]
-    ) => {
-      return dict.some(
-        ([home, away]) =>
-          (home === team1 && away === team2) ||
-          (home === team2 && away === team1)
-      );
-    };
-
-    for (let i = 0; i < numberOfDays / 2; i++) {
-      const matchUpsThisDay: HomeAwayTuple[] = [];
-
-      while (matchUpsThisDay.length < gamesPerDay) {
-        // Get two random teams
-        let homeTeam = 0;
-        let awayTeam = 0;
-
-        // Pick two teams that havent already this day and arent the same team
-        while (
-          homeTeam === awayTeam ||
-          teamHasAlreadyPlayed(homeTeam, matchUpsThisDay) ||
-          teamHasAlreadyPlayed(awayTeam, matchUpsThisDay)
-        ) {
-          homeTeam = randFromArray(TEAM_IDS);
-          awayTeam = randFromArray(TEAM_IDS);
-
-          console.log(
-            teamsHaveAlreadyPlayedEachOther(homeTeam, awayTeam, DICTS_OF_GAMES)
-          );
-        }
-
-        // Lets add their matchup
-        matchUpsThisDay.push([homeTeam, awayTeam]);
+    const timeStart = performance.now();
+    const schedule = new ScheduleCreator(
+      ["1", "2", "3", "4", "5", "6"],
+      [2, 5],
+      {
+        gamesAgainstEachTeam: numberOfGamesAgainstEachTeam,
       }
+    ).create();
 
-      DICTS_OF_GAMES.push(...matchUpsThisDay);
-    }
+    const timeEnd = performance.now();
 
-    setSchedule(DICTS_OF_GAMES);
+    console.log(timeEnd - timeStart);
+
+    setSchedule(schedule);
   };
 
   return (
@@ -278,7 +240,7 @@ function App() {
 
                           return acc;
                         }, [])
-                        .includes(id) === false
+                        .includes(id) === false && id !== team
                   ).join(" | ")}
                 </td>
               </tr>

@@ -31,6 +31,7 @@ export default class ScheduleCreator {
   private _teamsAsIds: number[];
   private _settings: Required<Omit<ScheduleSettings, "startDate">>;
   private _daysOfTheWeek: number[];
+  private _currentSchedule: HomeAwayTuple[] = [];
 
   constructor(
     teams: string[],
@@ -43,6 +44,73 @@ export default class ScheduleCreator {
     this._startDate = this._validateAndSetStartDate(settings?.startDate);
 
     this._settings = this._getDefaultSettings(settings);
+  }
+
+  private _toHomeAwayControl(
+    homeTeam: number,
+    awayTeam: number
+  ): HomeAwayTuple {
+    // Find matchups between these teams
+    const matchupsBetweenTeams = this._currentSchedule.filter(
+      (matchup) => matchup.includes(homeTeam) && matchup.includes(awayTeam)
+    );
+
+    if (matchupsBetweenTeams.length % 2 !== 0) {
+      const homeTeamHasMoreHomeGames =
+        matchupsBetweenTeams.filter((matchup) => matchup[0] === homeTeam)
+          .length >
+        matchupsBetweenTeams.length / 2;
+
+      if (homeTeamHasMoreHomeGames) return [awayTeam, homeTeam];
+      return [homeTeam, awayTeam];
+    }
+    // if (homeTeamHasMoreHomeGames) return [awayTeam, homeTeam];
+    // return [homeTeam, awayTeam];
+
+    const homeTeamHomeGamesCount = this._currentSchedule.filter(
+      (matchups) => matchups[0] === homeTeam
+    ).length;
+    const awayTeamHomeGamesCount = this._currentSchedule.filter(
+      (matchups) => matchups[0] === awayTeam
+    ).length;
+
+    if (homeTeamHomeGamesCount > awayTeamHomeGamesCount)
+      return [awayTeam, homeTeam];
+
+    return [homeTeam, awayTeam];
+  }
+
+  private _createMatchupPairs(
+    roundRobinRotated: number[],
+    i: number
+  ): HomeAwayTuple[] {
+    const numbOfPossibleMatchups = Math.floor(roundRobinRotated.length / 2);
+
+    const matchups: HomeAwayTuple[] = [];
+
+    // First matchup always plays
+    if (i % 2 === 0) {
+      matchups.push(
+        this._toHomeAwayControl(roundRobinRotated[0], roundRobinRotated[1])
+      );
+    } else {
+      matchups.push(
+        this._toHomeAwayControl(roundRobinRotated[1], roundRobinRotated[0])
+      );
+    }
+
+    // Then get the next item from the left of array, and next item from right of array
+    // If there is an odd number of teams, the median will be our bye
+    for (let i = 2; i < numbOfPossibleMatchups + 1; i++) {
+      matchups.push(
+        this._toHomeAwayControl(
+          roundRobinRotated[roundRobinRotated.length + 1 - i],
+          roundRobinRotated[i]
+        )
+      );
+    }
+
+    return matchups;
   }
 
   private _getDefaultSettings(settings: ScheduleSettings = {}) {
@@ -59,143 +127,101 @@ export default class ScheduleCreator {
     };
   }
 
-  /**
-   * Defines the max iterations on a given match day before recreating a schedule
-   */
-  private _defineMaxIterationsCount() {
-    return this._teams.length * this._teams.length;
-  }
-
   create() {
-    const numberOfGameDays =
-      ((this._teams.length - 1) * this._settings.gamesAgainstEachTeam) /
-      this._settings.gamesPerDay;
+    const numberOfByeDays =
+      (this._teams.length % 2) * this._settings.gamesAgainstEachTeam;
+    // const numberOfGameDays =
+    //   ((this._teams.length - 1) * this._settings.gamesAgainstEachTeam) /
+    //     this._settings.gamesPerDay +
+    //   numberOfByeDays;
 
     const numberOfGames =
       (this._teams.length - 1) *
       this._settings.gamesAgainstEachTeam *
       (this._teams.length / 2);
 
-    const maxIterationsCount = this._defineMaxIterationsCount();
+    const numberOfGameDays =
+      numberOfGames /
+      Math.floor((this._teams.length / 2) * this._settings.gamesPerDay);
 
-    let currentSchedule: HomeAwayTuple[] = [];
+    console.log({ numberOfGames });
 
-    let isValidHomeAndAway = false;
+    const isEvenTeams = this._teams.length % 2 === 0;
 
-    // We can only enforce valid home and away when the number of games each team has is even
-    const canEnforceValidHomeAndAway =
-      (numberOfGameDays * this._settings.gamesPerDay) % 2 === 0;
+    // Shuffle the teams that way we get a unique schedule every time
+    const teamsShuffled = shuffleArray(this._teamsAsIds);
 
-    while (
-      currentSchedule.length < numberOfGames ||
-      (isValidHomeAndAway === false &&
-        canEnforceValidHomeAndAway &&
-        this._teams.length < 11)
-    ) {
-      currentSchedule = [];
-      console.log("Create new Schedule");
+    console.log(teamsShuffled);
+    console.log({ numberOfGameDays });
 
-      for (let i = 0; i < numberOfGameDays; i++) {
-        let isValidDay = false;
-        let dayIterations = 0;
+    for (let i = 0; i < numberOfGameDays; i++) {
+      const sortedRoundRobin = isEvenTeams
+        ? this._rotateRoundRobinClockwiseEvenTeams(teamsShuffled, i)
+        : this._rotateRoundRobinClockwiseOddTeams(teamsShuffled, i);
 
-        while (isValidDay === false && dayIterations < maxIterationsCount) {
-          dayIterations++;
-          const shuffledTeams = shuffleArray(this._teamsAsIds);
+      const matchups = this._createMatchupPairs(sortedRoundRobin, i);
 
-          const { pairs, byeTeam } = this._pairTeams(
-            shuffledTeams,
-            currentSchedule
-          );
-
-          isValidDay = this._validatePairs(
-            pairs,
-            byeTeam,
-            currentSchedule,
-            Math.floor(
-              i / (numberOfGameDays / this._settings.gamesAgainstEachTeam)
-            ) + 1
-          );
-
-          if (!isValidDay) continue;
-
-          // Hash each matchup, and add it
-          pairs.forEach((pair) => {
-            currentSchedule.push(pair);
-          });
-        }
-
-        if (dayIterations === maxIterationsCount) break;
-      }
-
-      // Check that every team has the same amount of home and away games
-      const homeGames = this._getAllTeamsNumberOfHomeGames(
-        this._teamsAsIds,
-        currentSchedule
-      );
-
-      isValidHomeAndAway = homeGames.every((el) => el === homeGames[0]);
+      this._currentSchedule.push(...matchups);
     }
 
-    return currentSchedule;
+    return this._currentSchedule;
+  }
+
+  private _rotateRoundRobinClockwiseEvenTeams(
+    teamArr: number[],
+    iterations: number
+  ): number[] {
+    // If the number of iterations exceeds the team length, just get the remainder
+    if (iterations >= teamArr.length - 1) {
+      iterations = iterations % (teamArr.length - 1);
+    }
+
+    const newArr = new Array(teamArr.length);
+
+    // The first value is locked for even teams
+    newArr[0] = teamArr[0];
+
+    // First lets move the number of elements (iterations) from the end of the array, to the start
+    // starting with element index 1, because 0 is locked
+    for (let i = 0; i < iterations; i++) {
+      newArr[i + 1] = teamArr[teamArr.length - iterations + i];
+    }
+
+    // Now lets just paste the rest of the array, after all those iterations
+    for (let j = iterations + 1; j < teamArr.length; j++) {
+      newArr[j] = teamArr[j - iterations];
+    }
+
+    // [arr[0], ...elemsFromEndOfArray, ...restOfArray]
+    return newArr;
+  }
+
+  private _rotateRoundRobinClockwiseOddTeams(
+    teamArr: number[],
+    iterations: number
+  ): number[] {
+    if (iterations >= teamArr.length) {
+      iterations = iterations % teamArr.length;
+    }
+
+    const newArr = new Array(teamArr.length);
+
+    // First lets move the number of elements (iterations) from the end of the array, to the start
+    for (let i = 0; i < iterations; i++) {
+      newArr[i] = teamArr[teamArr.length - iterations + i];
+    }
+
+    // Now lets just copy all the items that werent moved, after all the items we just added
+    for (let j = iterations; j < teamArr.length; j++) {
+      newArr[j] = teamArr[j - iterations];
+    }
+
+    // [...elemsMoved, ...elemsNotMoved]
+    return newArr;
   }
 
   private _mapTeamsToIds(teams: string[]) {
     return teams.map((el, index) => index);
-  }
-
-  private _pairTeams(teamsAsIds: number[], schedule: HomeAwayTuple[]) {
-    return teamsAsIds.reduce(
-      (
-        acc: { pairs: HomeAwayTuple[]; byeTeam: number },
-        currentTeam,
-        index
-      ) => {
-        if (index % 2 !== 0) return acc;
-
-        const nextTeam = teamsAsIds[index + 1];
-
-        if (!nextTeam && nextTeam !== 0) {
-          // acc.byeTeam = currentTeam
-          return acc;
-        }
-
-        // Now lets find the team with less home games, and make them home
-
-        const team1HomeGames = schedule.filter(
-          (matchup) => matchup[0] === currentTeam
-        );
-        const team2HomeGames = schedule.filter(
-          (matchup) => matchup[0] === nextTeam
-        );
-
-        if (team1HomeGames.length > team2HomeGames.length) {
-          acc.pairs.push([nextTeam, currentTeam]);
-        } else {
-          acc.pairs.push([currentTeam, nextTeam]);
-        }
-
-        return acc;
-      },
-      { pairs: [], byeTeam: -1 }
-    );
-  }
-
-  private _validatePairs(
-    pairs: HomeAwayTuple[],
-    byeTeam: number,
-    currentSchedule: HomeAwayTuple[],
-    roundNumber: number
-  ) {
-    const duplicateMatchups = pairs.filter((pair) => {
-      const matchesTeamsHavePlayed = currentSchedule.filter(
-        (matchUp) => matchUp.includes(pair[0]) && matchUp.includes(pair[1])
-      );
-      return matchesTeamsHavePlayed.length >= roundNumber;
-    });
-
-    if (duplicateMatchups.length > 0) return false;
-    return true;
   }
 
   private _getAllTeamsNumberOfHomeGames(

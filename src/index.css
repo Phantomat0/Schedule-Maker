@@ -1,3 +1,8 @@
+:root {
+  --prim-1: #3498db;
+  --prim-2: #1e5c86;
+}
+
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen",
@@ -7,9 +12,189 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New",
-    monospace;
+.wrapper {
+  margin: 2rem auto;
+  width: clamp(768px, 70%, 1600px);
+}
+
+main {
+  margin-top: 1rem;
+}
+
+header {
+  height: 10vh;
+  border-bottom: 1px solid #ddd;
+  display: flex;
+  align-items: center;
+}
+
+header h1 {
+  margin-top: 0;
+}
+
+.main-container {
+  display: flex;
+}
+
+.main-container > section {
+  flex: 50%;
+}
+
+h2 {
+  margin: 0.5rem 0;
+}
+
+.input-remove-default {
+  outline: none;
+  border: none;
+  background-image: none;
+  background-color: transparent;
+  -webkit-box-shadow: none;
+  -moz-box-shadow: none;
+  box-shadow: none;
+}
+
+.team-list-wrapper {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.add-div-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.dates-to-skip-wrapper > div {
+  flex: calc(50% - 1rem);
+}
+
+.dates-to-skip-wrapper label {
+  margin-left: 0.3rem;
+}
+
+.date-container {
+  display: flex;
+  flex-direction: row;
+  gap: 0.5rem;
+  justify-content: center;
+  align-items: center;
+}
+
+.add-div-bttn {
+  background-color: #71ba51;
+  color: #fff;
+  border-bottom: 2px solid var(--prim-2);
+  padding: 5px 1rem;
+  border-radius: 8px;
+  font-size: 2rem;
+  cursor: pointer;
+}
+
+.team-list-wrapper > div {
+  flex: calc(50% - 1rem);
+  padding: 0;
+}
+
+.team-list {
+  padding: 0;
+  list-style: none;
+}
+
+.team-list li {
+  padding: 5px;
+  border: 1px solid #ddd;
+  margin-block: 0.3rem;
+  width: 100%;
+  display: flex;
+  animation: float-up;
+  animation-duration: 0.5s;
+}
+
+.team-del-bttn-wrapper {
+  display: flex;
+  justify-content: center;
+  flex: 10%;
+}
+
+.team-del-bttn {
+  visibility: hidden;
+  font-size: 1rem;
+  background-color: #fd5b03;
+  color: #fff;
+  padding: 4px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  border-bottom: 2px solid #cd4a03;
+}
+
+.team-list li:hover .team-del-bttn,
+.team-list input:focus .team-del-bttn {
+  visibility: visible !important;
+}
+
+.team-list li:hover {
+  background-color: #eee;
+}
+
+.team-list li:last-of-type {
+  border: none !important;
+}
+
+.team-list li:last-of-type:hover {
+  background-color: initial;
+}
+
+.team-add-bttn {
+  width: 100%;
+  background-color: #71ba51;
+  color: #fff;
+  padding: 4px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  border-bottom: 2px solid #4b8532;
+}
+
+.team-add-bttn:active {
+  background-color: #4b8532;
+}
+
+.team-list input {
+  flex: 90%;
+}
+
+/* SETTINGS */
+
+.settings {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.settings-row {
+  display: flex;
+  gap: 1rem;
+  border-bottom: 1px solid #ddd;
+  padding: 0.5rem 0;
+}
+
+.start-date-schedule > div {
+  display: flex;
+  flex-direction: column;
+  flex: calc(50% - 1rem);
+}
+
+.input-in-line {
+  text-align: center;
+  border-bottom: 2px solid var(--prim-1);
+  padding-left: 10px;
+  color: var(--prim-1);
+  font-size: 1.6rem;
+  font-weight: bold;
+  width: 3ch;
 }
 
 .schedule-picker {
@@ -22,6 +207,91 @@ code {
   flex-direction: column;
   justify-content: center;
   align-items: center;
+  cursor: pointer !important;
+  padding: 5px;
+  border-radius: 8px;
+}
+
+.day-of-the-week-item:hover {
+  background-color: #eee;
+}
+
+/* SCHEDULE */
+
+.schedule-table strong {
+  margin-right: 0.8rem;
+}
+
+.generate-sched-bttn {
+  background-color: var(--prim-1);
+  border-bottom: 2px solid var(--prim-2);
+  color: #fff;
+  height: 2.5rem;
+  padding: 0.5rem 1rem;
+  width: 100%;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.csv-bttn {
+  background-color: #808080;
+  border-bottom: 2px solid #545353;
+  color: #fff;
+  height: 2.5rem;
+  padding: 0.5rem 1rem;
+  width: 100%;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.buttons-container {
+  display: flex;
+  padding: 1rem;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.generate-sched-btn:active {
+  background-color: var(--prim-2);
+}
+
+.error-box {
+  background-color: rgba(255, 0, 0, 0.203);
+  border-radius: 12px;
+  padding: 0.5rem 1rem;
+}
+
+.error-box span {
+  color: red;
+  font-size: 1rem;
+}
+
+.schedule-stats {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+}
+
+.schedule-stats > div {
+  justify-content: center;
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 100%;
+}
+
+.schedule-stats > div h4 {
+  margin: 0;
+  font-size: 2rem;
+  color: var(--prim-1);
+}
+
+.schedule-stats > div span {
+  color: rgb(77, 75, 75);
+}
+
+.end-date {
+  font-size: 1.4rem !important;
 }
 
 table {
@@ -35,6 +305,7 @@ table thead {
   text-transform: uppercase;
   border-collapse: collapse;
   font-size: 14px;
+  border-bottom: 1px solid rgb(174, 173, 173);
 }
 
 table td,
@@ -42,4 +313,26 @@ table th {
   padding: 8px 5px;
   text-align: center;
   font-size: 14px;
+}
+
+@-webkit-keyframes float-up {
+  from {
+    opacity: 0;
+    transform: translateY(5%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0%);
+  }
+}
+
+@keyframes float-up {
+  from {
+    opacity: 0;
+    transform: translateY(5%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0%);
+  }
 }

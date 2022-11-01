@@ -1,4 +1,9 @@
-import { innerConcat, shuffleArray, splitAt } from "./utilts";
+import {
+  datesAreOnSameDay,
+  innerConcat,
+  shuffleArray,
+  splitAt,
+} from "./utilts";
 
 interface ScheduleSettings {
   /**
@@ -23,6 +28,12 @@ interface ScheduleSettings {
   gamesAgainstEachTeam?: number;
 }
 
+export class ScheduleCreatorError {
+  constructor(public message: string) {
+    this.message = message;
+  }
+}
+
 export type HomeAwayTuple = [number, number];
 
 export default class ScheduleCreator {
@@ -43,7 +54,20 @@ export default class ScheduleCreator {
     this._daysOfTheWeek = this._validateAndSetDaysOfWeek(daysOfTheWeek);
     this._startDate = this._validateAndSetStartDate(settings?.startDate);
 
+    this._validateStartDateIsNotSkipDate(settings?.datesToSkip);
+
     this._settings = this._getDefaultSettings(settings);
+  }
+
+  private _validateStartDateIsNotSkipDate(
+    datesToSkip: ScheduleSettings["datesToSkip"]
+  ) {
+    if (!datesToSkip) return;
+
+    if (datesToSkip.some((date) => datesAreOnSameDay(date, this._startDate)))
+      throw new ScheduleCreatorError(
+        "Validation Error: Start date cannot be skipped"
+      );
   }
 
   private _toHomeAwayControl(
@@ -127,14 +151,7 @@ export default class ScheduleCreator {
     };
   }
 
-  create() {
-    const numberOfByeDays =
-      (this._teams.length % 2) * this._settings.gamesAgainstEachTeam;
-    // const numberOfGameDays =
-    //   ((this._teams.length - 1) * this._settings.gamesAgainstEachTeam) /
-    //     this._settings.gamesPerDay +
-    //   numberOfByeDays;
-
+  private _createScheduledMatchups() {
     const numberOfGames =
       (this._teams.length - 1) *
       this._settings.gamesAgainstEachTeam *
@@ -144,15 +161,10 @@ export default class ScheduleCreator {
       numberOfGames /
       Math.floor((this._teams.length / 2) * this._settings.gamesPerDay);
 
-    console.log({ numberOfGames });
-
     const isEvenTeams = this._teams.length % 2 === 0;
 
     // Shuffle the teams that way we get a unique schedule every time
     const teamsShuffled = shuffleArray(this._teamsAsIds);
-
-    console.log(teamsShuffled);
-    console.log({ numberOfGameDays });
 
     for (let i = 0; i < numberOfGameDays; i++) {
       const sortedRoundRobin = isEvenTeams
@@ -161,10 +173,93 @@ export default class ScheduleCreator {
 
       const matchups = this._createMatchupPairs(sortedRoundRobin, i);
 
-      this._currentSchedule.push(...matchups);
+      this._currentSchedule.push(...shuffleArray(matchups));
     }
 
-    return this._currentSchedule;
+    return {
+      schedule: this._currentSchedule,
+      numberOfGames,
+      numberOfGameDays,
+    };
+  }
+
+  private _getMatchDayDates(numberOfGameDays: number) {
+    const startDate = this._startDate;
+
+    const dates: Date[] = [startDate];
+
+    let days = 1;
+
+    while (dates.length !== numberOfGameDays) {
+      const newDate = new Date(this._startDate);
+
+      const futureDate = new Date(newDate.setDate(startDate.getDate() + days));
+
+      const dayOfTheWeek = futureDate.getDay();
+
+      if (this._daysOfTheWeek.includes(dayOfTheWeek)) {
+        // Check if we are meant to skip this date
+        if (
+          this._settings.datesToSkip.some((date) =>
+            datesAreOnSameDay(date, futureDate)
+          )
+        ) {
+          days++;
+          continue;
+        }
+
+        dates.push(futureDate);
+      }
+
+      days++;
+    }
+
+    return dates;
+  }
+
+  private _assignMatchDayDates(
+    schedule: HomeAwayTuple[],
+    matchDayDates: Date[]
+  ) {
+    const matchDaysWithDates = [];
+
+    for (let i = 0; i < matchDayDates.length; i++) {
+      const matchDayMatchups = [];
+
+      for (let j = 0; j < Math.floor(this._teams.length / 2); j++) {
+        const adjustedJ: number =
+          matchDaysWithDates.length * Math.floor(this._teams.length / 2) +
+          matchDayMatchups.length;
+
+        matchDayMatchups.push({
+          date: matchDayDates[i],
+          home: schedule[adjustedJ][0],
+          away: schedule[adjustedJ][1],
+        });
+      }
+
+      matchDaysWithDates.push(matchDayMatchups);
+    }
+
+    return matchDaysWithDates;
+  }
+
+  create() {
+    const { schedule, numberOfGameDays, numberOfGames } =
+      this._createScheduledMatchups();
+
+    const matchDayDates = this._getMatchDayDates(numberOfGameDays);
+
+    const fullSchedule = this._assignMatchDayDates(schedule, matchDayDates);
+
+    return {
+      numberOfGameDays,
+      numberOfGames,
+      schedule: fullSchedule,
+      startDate: fullSchedule[0][0].date,
+      endDate: fullSchedule[fullSchedule.length - 1][0].date,
+      dates: matchDayDates,
+    };
   }
 
   private _rotateRoundRobinClockwiseEvenTeams(
@@ -224,44 +319,6 @@ export default class ScheduleCreator {
     return teams.map((el, index) => index);
   }
 
-  private _getAllTeamsNumberOfHomeGames(
-    teamIds: number[],
-    schedule: HomeAwayTuple[]
-  ) {
-    return teamIds.map((team) =>
-      this._getTeamsNumberOfHomeGames(team, schedule)
-    );
-  }
-
-  private _getTeamsNumberOfHomeGames(
-    teamId: number,
-    schedule: HomeAwayTuple[]
-  ) {
-    return schedule.filter((matchup) => matchup[0] === teamId).length;
-  }
-
-  private _shuffleTeams(teamsIds: number[], schedule: HomeAwayTuple[]) {
-    const sorted = this._sortByHomeGames(teamsIds, schedule);
-
-    const [homeMost, homeLeast] = splitAt(
-      Math.floor(teamsIds.length / 2),
-      sorted
-    );
-
-    const homeMostShuffled = shuffleArray(homeMost);
-    const homeLeastShuffled = shuffleArray(homeLeast);
-
-    return innerConcat(homeLeastShuffled, homeMostShuffled);
-  }
-
-  private _sortByHomeGames(teams: number[], schedule: HomeAwayTuple[]) {
-    return teams.sort(
-      (a, b) =>
-        this._getTeamsNumberOfHomeGames(b, schedule) -
-        this._getTeamsNumberOfHomeGames(a, schedule)
-    );
-  }
-
   private _validateAndSetDaysOfWeek(daysOfWeek: number[]) {
     // Filter out duplicates
     daysOfWeek = Array.from(new Set(daysOfWeek));
@@ -276,34 +333,52 @@ export default class ScheduleCreator {
     );
 
     if (invalidDaysOfWeek.length > 0)
-      throw Error(
+      throw new ScheduleCreatorError(
         `Validation Error: ${invalidDaysOfWeek.join(
           " "
         )}. Days of the Week must be integers between 0 and 6.`
       );
 
+    const defaultDaysOfTheWeek = [new Date().getDay()];
+
+    if (daysOfWeek.length === 0) return defaultDaysOfTheWeek;
+
     return daysOfWeek;
   }
 
   private _setStartDateToNearestFutureDayOfWeek() {
-    return new Date(Date.now());
+    // Get current date
+    const startDate = new Date(new Date().setHours(0, 0, 0, 0));
+
+    let days = 0;
+    while (true) {
+      const newDate = new Date();
+
+      const futureDate = new Date(newDate.setDate(startDate.getDate() + days));
+
+      const dayOfTheWeek = futureDate.getDay();
+
+      if (this._daysOfTheWeek.includes(dayOfTheWeek)) return futureDate;
+
+      days++;
+    }
   }
 
   private _validateAndSetStartDate(startDate: ScheduleSettings["startDate"]) {
     // Check if we have a supplied start date
-    const suppliedStartDate = startDate;
+    if (!startDate) return this._setStartDateToNearestFutureDayOfWeek();
 
-    if (!suppliedStartDate) return this._setStartDateToNearestFutureDayOfWeek();
+    // startDate = new Date(startDate.setHours(8, 0, 0, 0));
 
     // If we do, validate that it starts on a day of the week that we provided
-    const dayOfWeekAsInt = suppliedStartDate.getDay();
+    const dayOfWeekAsInt = startDate.getDay();
 
     const startDateIsOfSuppliedDaysOfWeek =
       this._daysOfTheWeek.includes(dayOfWeekAsInt);
 
     if (!startDateIsOfSuppliedDaysOfWeek)
-      throw Error(
-        `Validation Error: Start Date ${suppliedStartDate.getDate()} does not fall of any of the following days of the week: ${this._daysOfTheWeek.join(
+      throw new ScheduleCreatorError(
+        `Validation Error: Start Date ${startDate.toDateString()} does not fall of any of the following days of the week: ${this._daysOfTheWeek.join(
           " "
         )} `
       );

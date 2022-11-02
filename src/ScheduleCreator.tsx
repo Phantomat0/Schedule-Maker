@@ -1,5 +1,6 @@
 import {
   datesAreOnSameDay,
+  getRandomIntInRange,
   innerConcat,
   shuffleArray,
   splitAt,
@@ -22,10 +23,16 @@ interface ScheduleSettings {
   gamesPerDay?: number;
 
   /**
-   * How many times each team plays another team
+   * How many times each team plays another team in their respective division
    * @default 1
    */
   gamesAgainstEachTeam?: number;
+
+  /**
+   * How many games each team plays against an opposing division
+   * @default 1
+   */
+  gamesAgainstOtherDivision?: number;
 }
 
 export class ScheduleCreatorError {
@@ -38,14 +45,14 @@ export type HomeAwayTuple = [number, number];
 
 export default class ScheduleCreator {
   private _startDate: Date;
-  private _teams: string[];
-  private _teamsAsIds: number[];
+  private _teams: string[][];
+  private _teamsAsIds: number[][];
   private _settings: Required<Omit<ScheduleSettings, "startDate">>;
   private _daysOfTheWeek: number[];
   private _currentSchedule: HomeAwayTuple[] = [];
 
   constructor(
-    teams: string[],
+    teams: string[][],
     daysOfTheWeek: number[],
     settings?: ScheduleSettings
   ) {
@@ -104,6 +111,24 @@ export default class ScheduleCreator {
     return [homeTeam, awayTeam];
   }
 
+  private _createMatchupPairsDivisionalEvenTeams(
+    roundRobinRotated: number[][],
+    iterations: number
+  ) {
+    const matchups: HomeAwayTuple[] = [];
+
+    for (let i = 0; i < roundRobinRotated[0].length; i++) {
+      matchups.push(
+        this._toHomeAwayControl(
+          roundRobinRotated[0][i],
+          roundRobinRotated[1][i]
+        )
+      );
+    }
+
+    return matchups;
+  }
+
   private _createMatchupPairs(
     roundRobinRotated: number[],
     i: number
@@ -142,38 +167,183 @@ export default class ScheduleCreator {
       datesToSkip = [],
       gamesPerDay = 1,
       gamesAgainstEachTeam = 1,
+      gamesAgainstOtherDivision = 1,
     } = settings;
 
     return {
       datesToSkip,
       gamesPerDay,
       gamesAgainstEachTeam,
+      gamesAgainstOtherDivision,
     };
   }
 
-  private _createScheduledMatchups() {
-    const numberOfGames =
-      (this._teams.length - 1) *
+  private _getGameDaysToScheduleDivisionalGames(
+    numberOfGameDays: number,
+    gamesAgainstOtherDivision: number
+  ) {
+    const days: number[] = [];
+
+    for (let i = 0; i < gamesAgainstOtherDivision; i++) {
+      let randInt = -1;
+
+      while (randInt !== -1 && days.includes(randInt) === false) {
+        randInt = getRandomIntInRange(0, numberOfGameDays);
+      }
+
+      days.push(randInt);
+    }
+
+    return days.sort((a, b) => b - a);
+  }
+
+  private _createMatchUpPairsForDivisionalOddTeams(
+    matchesPlayed: HomeAwayTuple[]
+  ) {
+    const teamsThatDidntPlayTodayYet = this._teamsAsIds.map((divisionTeams) => {
+      return divisionTeams.filter(
+        (team) => matchesPlayed.some((el) => el.includes(team)) === false
+      );
+    });
+
+    console.log(
+      "TEAMS THAT DIDNT PLAY TODAY: ",
+      teamsThatDidntPlayTodayYet.flat().join(" | ")
+    );
+
+    const matchups: HomeAwayTuple[] = [];
+
+    for (let i = 0; i < teamsThatDidntPlayTodayYet[0].length; i++) {
+      matchups.push(
+        this._toHomeAwayControl(
+          teamsThatDidntPlayTodayYet[0][i],
+          teamsThatDidntPlayTodayYet[1][i]
+        )
+      );
+    }
+
+    return matchups;
+  }
+
+  private _shuffleDivisionTeams(teamsAsIds: number[][]) {
+    return teamsAsIds.map((divisionTeams) => shuffleArray(divisionTeams));
+  }
+
+  private _getNumberOfTotalGamesPerDivision(divIndex: number) {
+    const divisionTeams = this._teams[divIndex];
+
+    console.log(this._settings.gamesAgainstEachTeam);
+
+    const gamesAgainstOwnDivision =
       this._settings.gamesAgainstEachTeam *
-      (this._teams.length / 2);
+      divisionTeams.length *
+      (this._teams[0].length - 1);
+
+    console.log({ gamesAgainstOwnDivision });
+
+    return gamesAgainstOwnDivision / 2;
+  }
+
+  private _createScheduledMatchups() {
+    // const numberOfGames =
+    //   (this._teams[0].length - 1) *
+    //   this._settings.gamesAgainstEachTeam *
+    //   (this._teams[0].length / 2);
+
+    const numberOfGamesInDivision = this._teams.reduce((acc, val, index) => {
+      const totalGamesForDivision =
+        this._getNumberOfTotalGamesPerDivision(index);
+      return acc + totalGamesForDivision;
+    }, 0);
+
+    console.log();
+
+    const numberOfGamesOutDiv =
+      this._teams.length === 1
+        ? 0
+        : Math.ceil(
+            (this._teams.flat().length * this._settings.gamesAgainstEachTeam) /
+              2
+          );
+
+    const numberOfGames = numberOfGamesInDivision + numberOfGamesOutDiv;
+
+    console.log({ numberOfGamesOutDiv, numberOfGamesInDivision });
 
     const numberOfGameDays =
       numberOfGames /
-      Math.floor((this._teams.length / 2) * this._settings.gamesPerDay);
+      Math.floor((this._teams.flat().length / 2) * this._settings.gamesPerDay);
 
-    const isEvenTeams = this._teams.length % 2 === 0;
+    console.log({ numberOfGameDays });
+
+    if (Number.isInteger(numberOfGames) === false)
+      throw new ScheduleCreatorError(
+        "Schedule Error: Please make sure number of teams in each division is equal"
+      );
 
     // Shuffle the teams that way we get a unique schedule every time
-    const teamsShuffled = shuffleArray(this._teamsAsIds);
+    const teamsShuffled = this._shuffleDivisionTeams(this._teamsAsIds);
+
+    let gameDaysAgainstOtherDivisionCounter = 0;
+
+    const daysToScheduleDivisionalGames =
+      this._getGameDaysToScheduleDivisionalGames(
+        numberOfGameDays,
+        this._settings.gamesAgainstOtherDivision
+      );
 
     for (let i = 0; i < numberOfGameDays; i++) {
-      const sortedRoundRobin = isEvenTeams
-        ? this._rotateRoundRobinClockwiseEvenTeams(teamsShuffled, i)
-        : this._rotateRoundRobinClockwiseOddTeams(teamsShuffled, i);
+      // // Check if we wanna do divisional round this game day
+      if (daysToScheduleDivisionalGames.includes(i)) {
+        const sortedRoundRobin = this._rotateRoundRobinDivisional(
+          teamsShuffled,
+          gameDaysAgainstOtherDivisionCounter
+        );
 
-      const matchups = this._createMatchupPairs(sortedRoundRobin, i);
+        console.log({ sortedRoundRobin });
 
-      this._currentSchedule.push(...shuffleArray(matchups));
+        const matchups = this._createMatchupPairsDivisionalEvenTeams(
+          sortedRoundRobin,
+          gameDaysAgainstOtherDivisionCounter
+        );
+
+        console.log(matchups, "DIVISIONAL");
+
+        this._currentSchedule.push(...shuffleArray(matchups));
+
+        gameDaysAgainstOtherDivisionCounter++;
+        continue;
+      }
+
+      const matchupsThisGameDay: HomeAwayTuple[] = [];
+
+      for (let j = 0; j < this._teams.length; j++) {
+        const isEvenTeams = teamsShuffled[j].length % 2 === 0;
+
+        const sortedRoundRobin = isEvenTeams
+          ? this._rotateRoundRobinClockwiseEvenTeams(
+              teamsShuffled[j],
+              i - gameDaysAgainstOtherDivisionCounter
+            )
+          : this._rotateRoundRobinClockwiseOddTeams(
+              teamsShuffled[j],
+              i - gameDaysAgainstOtherDivisionCounter
+            );
+
+        const matchups = this._createMatchupPairs(
+          sortedRoundRobin,
+          i - gameDaysAgainstOtherDivisionCounter
+        );
+
+        matchupsThisGameDay.push(...matchups);
+      }
+
+      const interDivisionMatchups =
+        this._createMatchUpPairsForDivisionalOddTeams(matchupsThisGameDay);
+
+      const allMatchups = [...matchupsThisGameDay, ...interDivisionMatchups];
+
+      this._currentSchedule.push(...shuffleArray(allMatchups));
     }
 
     return {
@@ -221,14 +391,16 @@ export default class ScheduleCreator {
     schedule: HomeAwayTuple[],
     matchDayDates: Date[]
   ) {
+    console.log({ schedule });
     const matchDaysWithDates = [];
 
     for (let i = 0; i < matchDayDates.length; i++) {
       const matchDayMatchups = [];
 
-      for (let j = 0; j < Math.floor(this._teams.length / 2); j++) {
+      for (let j = 0; j < Math.floor(this._teams.flat().length / 2); j++) {
         const adjustedJ: number =
-          matchDaysWithDates.length * Math.floor(this._teams.length / 2) +
+          matchDaysWithDates.length *
+            Math.floor(this._teams.flat().length / 2) +
           matchDayMatchups.length;
 
         matchDayMatchups.push({
@@ -252,6 +424,8 @@ export default class ScheduleCreator {
 
     const fullSchedule = this._assignMatchDayDates(schedule, matchDayDates);
 
+    console.log(fullSchedule);
+
     return {
       numberOfGameDays,
       numberOfGames,
@@ -260,6 +434,37 @@ export default class ScheduleCreator {
       endDate: fullSchedule[fullSchedule.length - 1][0].date,
       dates: matchDayDates,
     };
+  }
+
+  private _rotateRoundRobinDivisional(teamArr: number[][], iterations: number) {
+    const div1 = teamArr[0];
+    const div2 = teamArr[1];
+
+    // Rotate first div, counter clockwise
+    const newDiv1 = new Array(div1.length);
+
+    for (let i = 0; i < iterations; i++) {
+      newDiv1[div1.length - iterations + i] = div1[i];
+    }
+
+    // Now lets just paste the rest of the array, after all those iterations
+    for (let j = iterations; j < div1.length; j++) {
+      newDiv1[j - iterations] = div1[j];
+    }
+
+    // Rotate second div, clockwise
+    const newDiv2 = new Array(div2.length);
+
+    for (let i = 0; i < iterations; i++) {
+      newDiv2[i] = div2[div2.length - iterations + i];
+    }
+
+    // Now lets just paste the rest of the array, after all those iterations
+    for (let j = iterations; j < div2.length; j++) {
+      newDiv2[j] = div2[j - iterations];
+    }
+
+    return [newDiv1, newDiv2];
   }
 
   private _rotateRoundRobinClockwiseEvenTeams(
@@ -286,6 +491,8 @@ export default class ScheduleCreator {
     for (let j = iterations + 1; j < teamArr.length; j++) {
       newArr[j] = teamArr[j - iterations];
     }
+
+    console.log(teamArr, newArr);
 
     // [arr[0], ...elemsFromEndOfArray, ...restOfArray]
     return newArr;
@@ -315,8 +522,10 @@ export default class ScheduleCreator {
     return newArr;
   }
 
-  private _mapTeamsToIds(teams: string[]) {
-    return teams.map((el, index) => index);
+  private _mapTeamsToIds(teams: string[][]) {
+    return teams.map((division, divisionIndex) => {
+      return division.map((team, index) => divisionIndex * 100 + index);
+    });
   }
 
   private _validateAndSetDaysOfWeek(daysOfWeek: number[]) {

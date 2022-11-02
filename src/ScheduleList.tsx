@@ -1,10 +1,17 @@
+import { match } from "assert";
 import ScheduleCreator from "./ScheduleCreator";
 import { daysDiff } from "./utilts";
 
 interface ScheduleListProps {
   schedule: ReturnType<ScheduleCreator["create"]>;
-  teamsList: string[];
+  teamsList: string[][];
 }
+
+const getTeamFromId = (teamId: number, teamsList: string[][]) => {
+  const divisionIndex = Math.floor(teamId / 100);
+  const teamIndex = teamId % 100;
+  return teamsList[divisionIndex][teamIndex];
+};
 
 const ScheduleList: React.FC<ScheduleListProps> = ({ schedule, teamsList }) => {
   return (
@@ -30,45 +37,58 @@ const ScheduleList: React.FC<ScheduleListProps> = ({ schedule, teamsList }) => {
         </div>
       </div>
 
-      <table>
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Games</th>
-            <th>Home</th>
-            <th>Away</th>
-          </tr>
-        </thead>
-        <tbody>
-          {teamsList.map((team, index) => {
-            return (
+      {teamsList.map((division, divisionIndex) => {
+        return (
+          <table>
+            <thead>
               <tr>
-                <td>{team}</td>
-                <td>
-                  {
-                    schedule.schedule
-                      .flat()
-                      .filter((el) => el.home === index || el.away === index)
-                      .length
-                  }
-                </td>
-                <td>
-                  {
-                    schedule.schedule.flat().filter((el) => el.home === index)
-                      .length
-                  }
-                </td>
-                <td>
-                  {
-                    schedule.schedule.flat().filter((el) => el.away === index)
-                      .length
-                  }
-                </td>
+                <th>Name</th>
+                <th>Games</th>
+                <th>Home</th>
+                <th>Away</th>
               </tr>
-            );
-          })}
-        </tbody>
-      </table>
+            </thead>
+            <tbody>
+              {division.map((team, index) => {
+                return (
+                  <tr>
+                    <td>{team}</td>
+                    <td>
+                      {
+                        schedule.schedule
+                          .flat()
+                          .filter(
+                            (el) =>
+                              el.home === divisionIndex * 100 + index ||
+                              el.away === divisionIndex * 100 + index
+                          ).length
+                      }
+                    </td>
+                    <td>
+                      {
+                        schedule.schedule
+                          .flat()
+                          .filter(
+                            (el) => el.home === divisionIndex * 100 + index
+                          ).length
+                      }
+                    </td>
+                    <td>
+                      {
+                        schedule.schedule
+                          .flat()
+                          .filter(
+                            (el) => el.away === divisionIndex * 100 + index
+                          ).length
+                      }
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        );
+      })}
 
       <table className="schedule-table">
         <thead>
@@ -90,8 +110,8 @@ const ScheduleList: React.FC<ScheduleListProps> = ({ schedule, teamsList }) => {
                 {el.map((matchup) => {
                   return (
                     <tr>
-                      <td>{teamsList[matchup.home]}</td>
-                      <td>{teamsList[matchup.away]}</td>
+                      <td>{getTeamFromId(matchup.home, teamsList)}</td>
+                      <td>{getTeamFromId(matchup.away, teamsList)}</td>
                     </tr>
                   );
                 })}

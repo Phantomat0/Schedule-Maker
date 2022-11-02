@@ -2,7 +2,7 @@ import { useState } from "react";
 import DateInput from "./DateInput";
 import ScheduleCreator, { ScheduleCreatorError } from "./ScheduleCreator";
 import ScheduleList from "./ScheduleList";
-import TeamList from "./TeamList";
+import DivisionTeamsList from "./DivisionTeamsList";
 
 const DAYS_OF_THE_WEEK = [
   {
@@ -36,9 +36,13 @@ const DAYS_OF_THE_WEEK = [
 ];
 
 function App() {
-  const [teamsList, setTeamsList] = useState<string[]>(["Team 1", "Team 2"]);
+  const [teamsList, setTeamsList] = useState<string[][]>([
+    ["Team 1", "Team 2"],
+  ]);
   const [numberOfGamesAgainstEachTeam, setNumberOfGamesAgainstEachTeam] =
     useState<number>(1);
+  const [gamesAgainstOtherDiv, setGamesAgainstOtherDiv] = useState<number>(1);
+
   const [daysOfTheWeek, setDaysOfTheWeek] = useState<number[]>([]);
   const [startDate, setStartDate] = useState<{
     year: number;
@@ -111,6 +115,18 @@ function App() {
     }
   };
 
+  const handleGamesAgainstOtherDivisionChange = (e: any) => {
+    const games = parseInt(e.target.value);
+
+    const MIN_GAMES = 1;
+    const MAX_GAMES = 14;
+
+    if (games < MIN_GAMES || games > MAX_GAMES) {
+    } else {
+      setGamesAgainstOtherDiv(games);
+    }
+  };
+
   const handleDateToSkipCheck = (e: any) => {
     const dateStringAsDate = new Date(e.target.value);
 
@@ -135,15 +151,11 @@ function App() {
     setScheduleError(null);
 
     try {
-      const scheduleObj = new ScheduleCreator(
-        new Array(teamsList.length).fill(1).map((el, index) => `${index}`),
-        daysOfTheWeek,
-        {
-          gamesAgainstEachTeam: numberOfGamesAgainstEachTeam,
-          startDate: makeDateFromDateInputs(),
-          datesToSkip: datesToSkip,
-        }
-      ).create();
+      const scheduleObj = new ScheduleCreator(teamsList, daysOfTheWeek, {
+        gamesAgainstEachTeam: numberOfGamesAgainstEachTeam,
+        startDate: makeDateFromDateInputs(),
+        datesToSkip: datesToSkip,
+      }).create();
 
       setSchedule(scheduleObj);
     } catch (e) {
@@ -188,6 +200,45 @@ function App() {
     return [];
   };
 
+  const addDivision = () => {
+    // Adds a division, and by default adds the same amount of teams to the division as the teams in the first division
+    const uniqueNames: string[] = [];
+
+    let newTeamId = 1;
+
+    for (let i = 0; i < teamsList[0].length; i++) {
+      let foundUniqueName = false;
+
+      while (foundUniqueName === false) {
+        const teamName = `Team ${newTeamId}`;
+
+        if (
+          teamsList.flat().includes(teamName) ||
+          uniqueNames.includes(teamName)
+        ) {
+          newTeamId++;
+          continue;
+        }
+
+        foundUniqueName = true;
+        uniqueNames.push(`Team ${newTeamId}`);
+      }
+    }
+
+    setTeamsList((teamsList) => [...teamsList, [...uniqueNames]]);
+  };
+
+  const dropDivision = (indexOfDivision: number) => {
+    // Prevent dropping all divisions
+    if (teamsList.length === 1) return;
+
+    // Reset the schedule in that case
+    setSchedule({});
+    const newTeamsList = [...teamsList];
+    newTeamsList.splice(indexOfDivision, 1);
+    setTeamsList([...newTeamsList]);
+  };
+
   const convertToCSV = () => {
     if ("schedule" in schedule) {
       const flatSchedule = schedule.schedule.flat();
@@ -212,22 +263,35 @@ function App() {
       <div className="wrapper">
         <header>
           <h1>Schedule Maker</h1>
+          <h5>By Phantomat0</h5>
         </header>
         <main>
           <div className="main-container">
             <section className="teams-wrapper">
               <h2>Teams</h2>
               <div className="team-list-wrapper">
-                <TeamList
-                  teamList={teamsList}
-                  setTeamsList={setTeamsList}
-                  index={1}
-                />
-                <div className="add-div-wrapper">
-                  <button className="add-div-bttn input-remove-default">
-                    +
-                  </button>
-                </div>
+                {teamsList.map((divisionTeams, index) => {
+                  return (
+                    <DivisionTeamsList
+                      divisonTeams={divisionTeams}
+                      teamsList={teamsList}
+                      setTeamsList={setTeamsList}
+                      dropDivision={dropDivision}
+                      index={index}
+                      key={index}
+                    />
+                  );
+                })}
+                {teamsList.length < 2 && (
+                  <div className="add-div-wrapper">
+                    <button
+                      onClick={addDivision}
+                      className="add-div-bttn input-remove-default"
+                    >
+                      +
+                    </button>
+                  </div>
+                )}
               </div>
             </section>
 
@@ -247,6 +311,22 @@ function App() {
                   {numberOfGamesAgainstEachTeam === 1 ? "time" : "times"}
                 </h3>
               </div>
+              {teamsList.length > 1 && (
+                <div className="settings-row">
+                  <h3>
+                    Teams play other division
+                    <input
+                      type="number"
+                      onChange={handleGamesAgainstOtherDivisionChange}
+                      min="1"
+                      max="14"
+                      defaultValue={1}
+                      className="input-remove-default input-in-line"
+                    ></input>
+                    {numberOfGamesAgainstEachTeam === 1 ? "time" : "times"}
+                  </h3>
+                </div>
+              )}
 
               <div className="settings-row start-date-schedule">
                 <div className="schedule-picker-wrapper">

@@ -1,10 +1,4 @@
-import {
-  datesAreOnSameDay,
-  getRandomIntInRange,
-  innerConcat,
-  shuffleArray,
-  splitAt,
-} from "./utilts";
+import { datesAreOnSameDay, getRandomIntInRange, shuffleArray } from "./utilts";
 
 interface ScheduleSettings {
   /**

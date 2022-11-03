@@ -1,9 +1,8 @@
-import { match } from "assert";
 import ScheduleCreator from "./ScheduleCreator";
 import { daysDiff } from "./utilts";
 
 interface ScheduleListProps {
-  schedule: ReturnType<ScheduleCreator["create"]>;
+  schedule: NonNullable<ReturnType<ScheduleCreator["create"]>>;
   teamsList: string[][];
 }
 

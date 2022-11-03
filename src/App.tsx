@@ -58,7 +58,7 @@ function App() {
     min: 0,
   });
   const [schedule, setSchedule] = useState<
-    ReturnType<ScheduleCreator["create"]> | {}
+    NonNullable<ReturnType<ScheduleCreator["create"]>> | {}
   >({});
   const [scheduleError, setScheduleError] = useState<string | null>(null);
   const [datesToSkip, setDatesToSkip] = useState<Date[]>([]);
@@ -153,11 +153,12 @@ function App() {
     try {
       const scheduleObj = new ScheduleCreator(teamsList, daysOfTheWeek, {
         gamesAgainstEachTeam: numberOfGamesAgainstEachTeam,
+        gamesAgainstOtherDivision: gamesAgainstOtherDiv,
         startDate: makeDateFromDateInputs(),
         datesToSkip: datesToSkip,
       }).create();
 
-      setSchedule(scheduleObj);
+      setSchedule(scheduleObj!);
     } catch (e) {
       if (e instanceof ScheduleCreatorError) {
         return setScheduleError(e.message);

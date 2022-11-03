@@ -77,6 +77,32 @@ export default class ScheduleCreator {
       );
   }
 
+  private _checkIfExactHomeAndAway(
+    schedule: HomeAwayTuple[],
+    numberOfGameDays: number
+  ) {
+    if (numberOfGameDays % 2 !== 0) return true;
+
+    const numbHomeGamesRecord = schedule.reduce(
+      (acc: Record<number, number>, val) => {
+        const [home] = val;
+
+        if (acc[home]) {
+          acc[home] = acc[home] + 1;
+        } else {
+          acc[home] = 1;
+        }
+
+        return acc;
+      },
+      {}
+    );
+
+    const recordAsArray = Object.values(numbHomeGamesRecord);
+
+    return recordAsArray.every((el) => el === recordAsArray[0]);
+  }
+
   private _toHomeAwayControl(
     homeTeam: number,
     awayTeam: number
@@ -86,6 +112,7 @@ export default class ScheduleCreator {
       (matchup) => matchup.includes(homeTeam) && matchup.includes(awayTeam)
     );
 
+    // If theres an odd nunber of matchups, find the team with less home games and make them home
     if (matchupsBetweenTeams.length % 2 !== 0) {
       const homeTeamHasMoreHomeGames =
         matchupsBetweenTeams.filter((matchup) => matchup[0] === homeTeam)
@@ -95,8 +122,6 @@ export default class ScheduleCreator {
       if (homeTeamHasMoreHomeGames) return [awayTeam, homeTeam];
       return [homeTeam, awayTeam];
     }
-    // if (homeTeamHasMoreHomeGames) return [awayTeam, homeTeam];
-    // return [homeTeam, awayTeam];
 
     const homeTeamHomeGamesCount = this._currentSchedule.filter(
       (matchups) => matchups[0] === homeTeam
@@ -119,9 +144,10 @@ export default class ScheduleCreator {
 
     for (let i = 0; i < roundRobinRotated[0].length; i++) {
       matchups.push(
-        this._toHomeAwayControl(
+        this._toHomeAwayControlDivisional(
           roundRobinRotated[0][i],
-          roundRobinRotated[1][i]
+          roundRobinRotated[1][i],
+          matchups
         )
       );
     }
@@ -187,7 +213,7 @@ export default class ScheduleCreator {
     for (let i = 0; i < gamesAgainstOtherDivision; i++) {
       let randInt = -1;
 
-      while (randInt !== -1 && days.includes(randInt) === false) {
+      while (randInt === -1 || days.includes(randInt)) {
         randInt = getRandomIntInRange(0, numberOfGameDays);
       }
 
@@ -205,11 +231,6 @@ export default class ScheduleCreator {
         (team) => matchesPlayed.some((el) => el.includes(team)) === false
       );
     });
-
-    console.log(
-      "TEAMS THAT DIDNT PLAY TODAY: ",
-      teamsThatDidntPlayTodayYet.flat().join(" | ")
-    );
 
     const matchups: HomeAwayTuple[] = [];
 
@@ -232,49 +253,32 @@ export default class ScheduleCreator {
   private _getNumberOfTotalGamesPerDivision(divIndex: number) {
     const divisionTeams = this._teams[divIndex];
 
-    console.log(this._settings.gamesAgainstEachTeam);
-
     const gamesAgainstOwnDivision =
       this._settings.gamesAgainstEachTeam *
       divisionTeams.length *
       (this._teams[0].length - 1);
 
-    console.log({ gamesAgainstOwnDivision });
-
     return gamesAgainstOwnDivision / 2;
   }
 
   private _createScheduledMatchups() {
-    // const numberOfGames =
-    //   (this._teams[0].length - 1) *
-    //   this._settings.gamesAgainstEachTeam *
-    //   (this._teams[0].length / 2);
-
     const numberOfGamesInDivision = this._teams.reduce((acc, val, index) => {
       const totalGamesForDivision =
         this._getNumberOfTotalGamesPerDivision(index);
       return acc + totalGamesForDivision;
     }, 0);
 
-    console.log();
-
     const numberOfGamesOutDiv =
       this._teams.length === 1
         ? 0
-        : Math.ceil(
-            (this._teams.flat().length * this._settings.gamesAgainstEachTeam) /
-              2
-          );
+        : this._settings.gamesAgainstOtherDivision *
+          (this._teams.flat().length / 2);
 
     const numberOfGames = numberOfGamesInDivision + numberOfGamesOutDiv;
-
-    console.log({ numberOfGamesOutDiv, numberOfGamesInDivision });
 
     const numberOfGameDays =
       numberOfGames /
       Math.floor((this._teams.flat().length / 2) * this._settings.gamesPerDay);
-
-    console.log({ numberOfGameDays });
 
     if (Number.isInteger(numberOfGames) === false)
       throw new ScheduleCreatorError(
@@ -287,10 +291,12 @@ export default class ScheduleCreator {
     let gameDaysAgainstOtherDivisionCounter = 0;
 
     const daysToScheduleDivisionalGames =
-      this._getGameDaysToScheduleDivisionalGames(
-        numberOfGameDays,
-        this._settings.gamesAgainstOtherDivision
-      );
+      this._teams.length > 1
+        ? this._getGameDaysToScheduleDivisionalGames(
+            numberOfGameDays,
+            this._settings.gamesAgainstOtherDivision
+          )
+        : [];
 
     for (let i = 0; i < numberOfGameDays; i++) {
       // // Check if we wanna do divisional round this game day
@@ -300,14 +306,10 @@ export default class ScheduleCreator {
           gameDaysAgainstOtherDivisionCounter
         );
 
-        console.log({ sortedRoundRobin });
-
         const matchups = this._createMatchupPairsDivisionalEvenTeams(
           sortedRoundRobin,
           gameDaysAgainstOtherDivisionCounter
         );
-
-        console.log(matchups, "DIVISIONAL");
 
         this._currentSchedule.push(...shuffleArray(matchups));
 
@@ -391,7 +393,6 @@ export default class ScheduleCreator {
     schedule: HomeAwayTuple[],
     matchDayDates: Date[]
   ) {
-    console.log({ schedule });
     const matchDaysWithDates = [];
 
     for (let i = 0; i < matchDayDates.length; i++) {
@@ -416,24 +417,84 @@ export default class ScheduleCreator {
     return matchDaysWithDates;
   }
 
+  private _toHomeAwayControlDivisional(
+    homeTeam: number,
+    awayTeam: number,
+    matchupsStaged: HomeAwayTuple[]
+  ): HomeAwayTuple {
+    const initialHomeAwayControl = this._toHomeAwayControl(homeTeam, awayTeam);
+
+    // If we did do a switch, we dont do anything
+    if (initialHomeAwayControl[0] !== homeTeam) return initialHomeAwayControl;
+
+    const divIndexOfHomeTeam = this._teamsAsIds.findIndex((division) =>
+      division.includes(homeTeam)
+    );
+    const divIndexOfAwayTeam = this._teamsAsIds.findIndex((division) =>
+      division.includes(awayTeam)
+    );
+
+    const homeTeamDivisionHomeGamesCount = this._getHomeGamesPlayedForDivIndex(
+      divIndexOfHomeTeam,
+      matchupsStaged
+    );
+    const awayTeamDivisionHomeGamesCount = this._getHomeGamesPlayedForDivIndex(
+      divIndexOfHomeTeam,
+      matchupsStaged
+    );
+
+    if (homeTeamDivisionHomeGamesCount > awayTeamDivisionHomeGamesCount)
+      return [awayTeam, homeTeam];
+    return [homeTeam, awayTeam];
+  }
+
+  private _getHomeGamesPlayedForDivIndex(
+    divIndex: number,
+    matchupsStaged: HomeAwayTuple[]
+  ) {
+    const fullScheduleWithStagedMatchups = [
+      ...this._currentSchedule,
+      ...matchupsStaged,
+    ];
+    const division = this._teamsAsIds[divIndex];
+
+    const homeGamesCountByDivisionTeams = fullScheduleWithStagedMatchups.filter(
+      (matchup) => division.includes(matchup[0])
+    ).length;
+
+    return homeGamesCountByDivisionTeams;
+  }
+
   create() {
-    const { schedule, numberOfGameDays, numberOfGames } =
-      this._createScheduledMatchups();
+    let isAllExactHomeAndAway = false;
 
-    const matchDayDates = this._getMatchDayDates(numberOfGameDays);
+    while (isAllExactHomeAndAway === false) {
+      const { schedule, numberOfGameDays, numberOfGames } =
+        this._createScheduledMatchups();
 
-    const fullSchedule = this._assignMatchDayDates(schedule, matchDayDates);
+      isAllExactHomeAndAway = this._checkIfExactHomeAndAway(
+        schedule,
+        numberOfGameDays
+      );
 
-    console.log(fullSchedule);
+      if (!isAllExactHomeAndAway) {
+        this._currentSchedule = [];
+        continue;
+      }
 
-    return {
-      numberOfGameDays,
-      numberOfGames,
-      schedule: fullSchedule,
-      startDate: fullSchedule[0][0].date,
-      endDate: fullSchedule[fullSchedule.length - 1][0].date,
-      dates: matchDayDates,
-    };
+      const matchDayDates = this._getMatchDayDates(numberOfGameDays);
+
+      const fullSchedule = this._assignMatchDayDates(schedule, matchDayDates);
+
+      return {
+        numberOfGameDays,
+        numberOfGames,
+        schedule: fullSchedule,
+        startDate: fullSchedule[0][0].date,
+        endDate: fullSchedule[fullSchedule.length - 1][0].date,
+        dates: matchDayDates,
+      };
+    }
   }
 
   private _rotateRoundRobinDivisional(teamArr: number[][], iterations: number) {
@@ -491,8 +552,6 @@ export default class ScheduleCreator {
     for (let j = iterations + 1; j < teamArr.length; j++) {
       newArr[j] = teamArr[j - iterations];
     }
-
-    console.log(teamArr, newArr);
 
     // [arr[0], ...elemsFromEndOfArray, ...restOfArray]
     return newArr;

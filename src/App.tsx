@@ -240,16 +240,26 @@ function App() {
     setTeamsList([...newTeamsList]);
   };
 
+  const getTeamNameFromId = (id: number) => {
+    const divIndex = Math.floor(id / 100);
+    const teamIndex = id % 100;
+
+    return teamsList[divIndex][teamIndex];
+  };
+
   const convertToCSV = () => {
     if ("schedule" in schedule) {
       const flatSchedule = schedule.schedule.flat();
-      const headers = Object.keys(flatSchedule[0]);
 
       const csvRows: string[] = [`home, away, date \n`];
 
       for (const row of flatSchedule) {
+        const homeTeamName = getTeamNameFromId(row.home);
+        const awayTeamName = getTeamNameFromId(row.away);
         // Add comma between each value
-        csvRows.push(`${row.home}, ${row.away}, ${row.date.toISOString()}\n`);
+        csvRows.push(
+          `${homeTeamName}, ${awayTeamName}, ${row.date.toISOString()}\n`
+        );
       }
 
       // Join every line with new line character
@@ -263,7 +273,7 @@ function App() {
     <div className="App">
       <div className="wrapper">
         <header>
-          <h1>Schedule Maker</h1>
+          <h1>League Schedule Maker</h1>
           <h5>By Phantomat0</h5>
         </header>
         <main>

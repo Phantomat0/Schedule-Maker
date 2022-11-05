@@ -334,6 +334,12 @@ export default class ScheduleCreator {
         matchupsThisGameDay.push(...matchups);
       }
 
+      // If 1 division, we're done
+      if (this._teamsAsIds.length === 1) {
+        this._currentSchedule.push(...matchupsThisGameDay);
+        continue;
+      }
+
       const interDivisionMatchups =
         this._createMatchUpPairsForDivisionalOddTeams(matchupsThisGameDay);
 
@@ -433,7 +439,7 @@ export default class ScheduleCreator {
       matchupsStaged
     );
     const awayTeamDivisionHomeGamesCount = this._getHomeGamesPlayedForDivIndex(
-      divIndexOfHomeTeam,
+      divIndexOfAwayTeam,
       matchupsStaged
     );
 

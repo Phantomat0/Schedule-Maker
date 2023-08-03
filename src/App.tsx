@@ -248,19 +248,23 @@ function App() {
   };
 
   const convertToCSV = () => {
+    console.log("YUPP");
     if ("schedule" in schedule) {
-      const flatSchedule = schedule.schedule.flat();
+      const csvRows: string[] = [`day,home,away,date\n`];
 
-      const csvRows: string[] = [`home, away, date \n`];
+      schedule.schedule.forEach((gameDay, index) => {
+        const day = index + 1;
 
-      for (const row of flatSchedule) {
-        const homeTeamName = getTeamNameFromId(row.home);
-        const awayTeamName = getTeamNameFromId(row.away);
-        // Add comma between each value
-        csvRows.push(
-          `${homeTeamName}, ${awayTeamName}, ${row.date.toISOString()}\n`
-        );
-      }
+        gameDay.forEach((game) => {
+          const homeTeamName = getTeamNameFromId(game.home);
+          const awayTeamName = getTeamNameFromId(game.away);
+
+          // Add comma between each value
+          csvRows.push(
+            `${day},${homeTeamName},${awayTeamName},${game.date.toISOString()}\n`
+          );
+        });
+      });
 
       // Join every line with new line character
       return csvRows;
